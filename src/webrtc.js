@@ -1,107 +1,130 @@
 // webrtc.js
 import { db } from "./firebase";
-import { doc, setDoc, onSnapshot } from "firebase/firestore";
+import {
+  doc,
+  setDoc,
+  onSnapshot,
+  getDoc,
+  collection,
+  addDoc,
+  query,
+  onSnapshot as onSubcollectionSnapshot,
+} from "firebase/firestore";
 
 let peerConnection;
-let localStream;
-let remoteStream;
-let isMicOn = true;
+let stream;
 
-const config = {
-  iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
-};
-
-export const startStreaming = async (roomId) => {
+export async function startStreaming(roomId) {
   try {
     const displayStream = await navigator.mediaDevices.getDisplayMedia({
       video: true,
       audio: true,
     });
 
-    const micStream = await navigator.mediaDevices.getUserMedia({
-      audio: true,
-    });
-
+    const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
     micStream.getAudioTracks().forEach((track) => {
       displayStream.addTrack(track);
     });
 
-    localStream = displayStream;
-    peerConnection = new RTCPeerConnection(config);
+    stream = displayStream;
+    peerConnection = new RTCPeerConnection();
 
-    localStream.getTracks().forEach((track) => {
-      peerConnection.addTrack(track, localStream);
+    stream.getTracks().forEach((track) => {
+      peerConnection.addTrack(track, stream);
     });
 
     const offer = await peerConnection.createOffer();
     await peerConnection.setLocalDescription(offer);
 
-    await setDoc(doc(db, "rooms", roomId, "webrtc", "offer"), {
-      sdp: offer.sdp,
-      type: offer.type,
-    });
+    const roomRef = doc(db, "rooms", roomId);
+    await setDoc(roomRef, { offer });
 
-    const answerRef = doc(db, "rooms", roomId, "webrtc", "answer");
-    onSnapshot(answerRef, async (docSnap) => {
-      const data = docSnap.data();
-      if (data && data.type === "answer") {
-        const remoteDesc = new RTCSessionDescription(data);
-        if (!peerConnection.currentRemoteDescription) {
-          await peerConnection.setRemoteDescription(remoteDesc);
-        }
+    console.log("Dómari: Byrjar streymi fyrir room:", roomId);
+
+    // Listen for answer
+    onSnapshot(roomRef, async (snapshot) => {
+      const data = snapshot.data();
+      if (data?.answer && !peerConnection.currentRemoteDescription) {
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+        console.log("Dómari: Tengdur keppanda!");
       }
     });
+
+    // Send ICE candidates
+    peerConnection.onicecandidate = async (event) => {
+      if (event.candidate) {
+        const candidatesRef = collection(db, "rooms", roomId, "callerCandidates");
+        await addDoc(candidatesRef, event.candidate.toJSON());
+      }
+    };
   } catch (err) {
-    console.error("Villa í startStreaming:", err);
+    console.error("Villa við að starta streymi:", err);
   }
-};
+}
 
-export const joinStreaming = async (roomId) => {
+export async function joinStreaming(roomId) {
   try {
-    peerConnection = new RTCPeerConnection(config);
-    remoteStream = new MediaStream();
+    const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    stream = micStream;
 
-    peerConnection.ontrack = (event) => {
-      event.streams[0].getTracks().forEach((track) => {
-        remoteStream.addTrack(track);
-      });
-      const remoteAudio = new Audio();
-      remoteAudio.srcObject = remoteStream;
-      remoteAudio.autoplay = true;
-      remoteAudio.controls = true;
-      document.body.appendChild(remoteAudio);
+    peerConnection = new RTCPeerConnection();
+    stream.getTracks().forEach((track) => {
+      peerConnection.addTrack(track, stream);
+    });
+
+    const roomDocRef = doc(db, "rooms", roomId);
+    const roomDoc = await getDoc(roomDocRef);
+    if (!roomDoc.exists()) {
+      throw new Error("Streymi ekki fundið fyrir þetta herbergi.");
+    }
+
+    const offer = roomDoc.data().offer;
+    await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+
+    const answer = await peerConnection.createAnswer();
+    await peerConnection.setLocalDescription(answer);
+
+    await setDoc(roomDocRef, {
+      offer,
+      answer,
+    });
+
+    // Send ICE candidates
+    peerConnection.onicecandidate = async (event) => {
+      if (event.candidate) {
+        const candidatesRef = collection(db, "rooms", roomId, "calleeCandidates");
+        await addDoc(candidatesRef, event.candidate.toJSON());
+      }
     };
 
-    const offerRef = doc(db, "rooms", roomId, "webrtc", "offer");
-    onSnapshot(offerRef, async (docSnap) => {
-      const data = docSnap.data();
-      if (data && data.type === "offer" && !peerConnection.currentRemoteDescription) {
-        const offer = new RTCSessionDescription(data);
-        await peerConnection.setRemoteDescription(offer);
+    // Receive remote stream
+    peerConnection.ontrack = (event) => {
+      const remoteStream = event.streams[0];
+      const audio = document.createElement("audio");
+      audio.srcObject = remoteStream;
+      audio.autoplay = true;
+      document.body.appendChild(audio);
+    };
 
-        const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        micStream.getTracks().forEach((track) => peerConnection.addTrack(track, micStream));
-        localStream = micStream;
-
-        const answer = await peerConnection.createAnswer();
-        await peerConnection.setLocalDescription(answer);
-
-        await setDoc(doc(db, "rooms", roomId, "webrtc", "answer"), {
-          sdp: answer.sdp,
-          type: answer.type,
-        });
-      }
+    // Listen for ICE candidates from caller
+    const callerCandidatesRef = collection(db, "rooms", roomId, "callerCandidates");
+    onSubcollectionSnapshot(callerCandidatesRef, (snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === "added") {
+          const candidate = new RTCIceCandidate(change.doc.data());
+          peerConnection.addIceCandidate(candidate);
+        }
+      });
     });
   } catch (err) {
-    console.error("Villa í joinStreaming:", err);
+    console.error("Villa við að tengjast streymi:", err);
   }
-};
+}
 
-export const toggleMic = () => {
-  if (!localStream) return isMicOn;
-  localStream.getAudioTracks().forEach((track) => {
-    track.enabled = !track.enabled;
-  });
-  isMicOn = !isMicOn;
-  return isMicOn;
-};
+export function toggleMic() {
+  if (!stream) return;
+  const audioTracks = stream.getAudioTracks();
+  const enabled = !audioTracks[0].enabled;
+  audioTracks.forEach((track) => (track.enabled = enabled));
+  return enabled;
+}
