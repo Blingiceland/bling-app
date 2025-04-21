@@ -175,7 +175,7 @@ function App() {
   if (mode === "host") {
     return (
       <div className="text-center p-6 min-h-screen bg-gradient-to-b from-purple-800 to-black text-white">
-        <h1 className="text-4xl font-extrabold mb-2">Dómari-test 🎧</h1>
+        <h1 className="text-4xl font-extrabold mb-2">Dómari 🎧</h1>
         <button onClick={createRoom} className="bg-yellow-500 hover:bg-yellow-600 px-6 py-3 text-xl rounded mb-4">Stofna nýtt herbergi</button>
         {roomId && (
           <>
