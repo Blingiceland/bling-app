@@ -1,183 +1,69 @@
-// App.js
-import React, { useState, useEffect } from "react";
-import { db } from "./firebase";
-import {
-  collection,
-  addDoc,
-  getDocs,
-  doc,
-  getDoc,
-  setDoc,
-  updateDoc,
-  onSnapshot,
-  serverTimestamp,
-  increment
-} from "firebase/firestore";
-import { startStreaming, joinStreaming, toggleMic, initWebRTC } from "./webrtc";
+let localStream = null;
+let peerConnection = null;
 
-function App() {
-  const [mode, setMode] = useState(null);
-  const [roomId, setRoomId] = useState(null);
-  const [inputRoomId, setInputRoomId] = useState("");
-  const [playerName, setPlayerName] = useState("");
-  const [joined, setJoined] = useState(false);
-  const [firstBling, setFirstBling] = useState(null);
-  const [players, setPlayers] = useState({});
-  const [timer, setTimer] = useState(null);
-  const [micOn, setMicOn] = useState(true);
+const config = {
+  iceServers: [
+    { urls: "stun:stun.l.google.com:19302" },
+  ],
+};
 
-  useEffect(() => {
-    let countdown;
-    if (firstBling) {
-      setTimer(15);
-      countdown = setInterval(async () => {
-        setTimer((prev) => {
-          if (prev === 1) {
-            clearInterval(countdown);
-            handleTimeOut();
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    } else {
-      setTimer(null);
-    }
-    return () => clearInterval(countdown);
-  }, [firstBling]);
+export async function startStreaming(roomId) {
+  console.log("Dómari: Byrjar streymi fyrir room:", roomId);
 
-  const handleTimeOut = async () => {
-    if (roomId) {
-      const roomRef = doc(db, "rooms", roomId);
-      await updateDoc(roomRef, {
-        firstBling: null
-      });
-    }
-  };
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    peerConnection = new RTCPeerConnection(config);
 
-  useEffect(() => {
-    if (roomId) {
-      const roomRef = doc(db, "rooms", roomId);
-      const unsubRoom = onSnapshot(roomRef, (docSnap) => {
-        if (docSnap.exists()) {
-          setFirstBling(docSnap.data().firstBling);
-        }
-      });
+    // Add tracks to connection
+    localStream.getTracks().forEach((track) => {
+      peerConnection.addTrack(track, localStream);
+    });
 
-      const playersRef = collection(db, "rooms", roomId, "players");
-      const unsubPlayers = onSnapshot(playersRef, (snapshot) => {
-        const updatedPlayers = {};
-        snapshot.forEach((doc) => {
-          updatedPlayers[doc.id] = doc.data().score;
-        });
-        setPlayers(updatedPlayers);
-      });
+    // Create offer
+    const offer = await peerConnection.createOffer();
+    await peerConnection.setLocalDescription(offer);
 
-      return () => {
-        unsubRoom();
-        unsubPlayers();
-      };
-    }
-  }, [roomId]);
-
-  const createRoom = async () => {
-    try {
-      const docRef = await addDoc(collection(db, "rooms"), {
-        createdAt: serverTimestamp(),
-        firstBling: null
-      });
-      setRoomId(docRef.id);
-    } catch (error) {
-      console.error("Villa við að stofna herbergi:", error);
-    }
-  };
-
-  const joinRoom = async () => {
-    try {
-      if (!playerName) {
-        alert("Vinsamlegast sláðu inn nafn!");
-        return;
-      }
-
-      const docRef = doc(db, "rooms", inputRoomId);
-      const docSnap = await getDoc(docRef);
-
-      if (docSnap.exists()) {
-        const playersRef = collection(db, "rooms", inputRoomId, "players");
-        const playersSnap = await getDocs(playersRef);
-
-        if (playersSnap.size >= 2) {
-          alert("⚠️ Fullt í herberginu – aðeins tveir keppendur í einu.");
-          return;
-        }
-
-        setRoomId(inputRoomId);
-        setJoined(true);
-
-        const playerRef = doc(playersRef, playerName);
-        const playerSnap = await getDoc(playerRef);
-        if (!playerSnap.exists()) {
-          await setDoc(playerRef, { score: 0 });
-        }
-
-        // Start listening for WebRTC offer
-        initWebRTC(inputRoomId);
-      } else {
-        alert("Herbergið finnst ekki!");
-      }
-    } catch (error) {
-      console.error("Villa við að tengjast herbergi:", error);
-    }
-  };
-
-  const sendBling = async () => {
-    try {
-      const roomRef = doc(db, "rooms", roomId);
-      const roomSnap = await getDoc(roomRef);
-
-      if (roomSnap.exists() && !roomSnap.data().firstBling) {
-        await updateDoc(roomRef, {
-          firstBling: playerName
-        });
-      }
-    } catch (error) {
-      console.error("Villa við BLING:", error);
-    }
-  };
-
-  const clearBling = async () => {
-    if (roomId) {
-      const roomRef = doc(db, "rooms", roomId);
-      await updateDoc(roomRef, { firstBling: null });
-    }
-  };
-
-  const addScore = async (name, points) => {
-    if (roomId) {
-      const playerRef = doc(db, "rooms", roomId, "players", name);
-      await updateDoc(playerRef, { score: increment(points) });
-      await clearBling();
-    }
-  };
-
-  const toggleMicHandler = () => {
-    const isNowOn = toggleMic();
-    setMicOn(isNowOn);
-  };
-
-  if (!mode) {
-    return (
-      <div className="text-center p-6">
-        <h1 className="text-4xl font-bold mb-4">Bling 🎵</h1>
-        <button onClick={() => setMode("host")} className="mr-4 bg-yellow-400 px-4 py-2 rounded">Ég er dómari</button>
-        <button onClick={() => setMode("player")} className="bg-green-400 px-4 py-2 rounded">Ég er keppandi</button>
-      </div>
-    );
+    // Send offer manually (einfalt í þróunarfasa)
+    const offerText = JSON.stringify(offer);
+    prompt("Afritaðu og sendu keppanda þetta OFFER:", offerText);
+  } catch (error) {
+    console.error("Dómari: Villa við að starta streymi:", error);
   }
-
-  // ... rest af dómara og keppanda útliti helst óbreytt
-
-  return null;
 }
 
-export default App;
+export async function joinStreaming(roomId) {
+  console.log("Keppandi: Tengist streymi fyrir room:", roomId);
+
+  try {
+    peerConnection = new RTCPeerConnection(config);
+
+    // Prompt for offer manually
+    const offerString = prompt("Límdu OFFER frá dómara hér:");
+    const offer = JSON.parse(offerString);
+    await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+
+    const answer = await peerConnection.createAnswer();
+    await peerConnection.setLocalDescription(answer);
+
+    // Play audio stream when received
+    peerConnection.ontrack = (event) => {
+      const remoteAudio = new Audio();
+      remoteAudio.srcObject = event.streams[0];
+      remoteAudio.play();
+    };
+
+    // Send answer back manually
+    const answerText = JSON.stringify(answer);
+    prompt("Sendu þetta til baka til dómara (ANSWER):", answerText);
+  } catch (error) {
+    console.error("Keppandi: Villa við að tengjast streymi:", error);
+  }
+}
+
+export function toggleMic() {
+  if (!localStream) return false;
+
+  const audioTrack = localStream.getAudioTracks()[0];
+  audioTrack.enabled = !audioTrack.enabled;
+  return audioTrack.enabled;
+}
