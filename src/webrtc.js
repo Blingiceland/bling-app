@@ -1,71 +1,98 @@
-// src/webrtc.js
+// webrtc.js
+import { db } from "./firebase";
+import {
+  doc,
+  setDoc,
+  onSnapshot,
+} from "firebase/firestore";
+
 let localStream;
 let peerConnection;
-const config = {
-  iceServers: [
-    { urls: "stun:stun.l.google.com:19302" }
-  ]
+
+const servers = {
+  iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
 };
 
 export const startStreaming = async (roomId) => {
   try {
-    console.log("Dómari: Byrjar streymi fyrir room:", roomId);
-
     localStream = await navigator.mediaDevices.getDisplayMedia({
       video: true,
-      audio: true
+      audio: true,
     });
 
-    peerConnection = new RTCPeerConnection(config);
+    peerConnection = new RTCPeerConnection(servers);
 
-    localStream.getTracks().forEach(track => {
+    localStream.getTracks().forEach((track) => {
       peerConnection.addTrack(track, localStream);
+    });
+
+    const offer = await peerConnection.createOffer();
+    await peerConnection.setLocalDescription(offer);
+
+    await setDoc(doc(db, "rooms", roomId, "webrtc", "offer"), {
+      sdp: offer.sdp,
+      type: offer.type,
+    });
+
+    const answerRef = doc(db, "rooms", roomId, "webrtc", "answer");
+    onSnapshot(answerRef, async (docSnap) => {
+      const data = docSnap.data();
+      if (data && data.type === "answer") {
+        const remoteDesc = new RTCSessionDescription(data);
+        await peerConnection.setRemoteDescription(remoteDesc);
+      }
     });
 
     peerConnection.onicecandidate = (event) => {
       if (event.candidate) {
-        console.log("ICE candidate:", event.candidate);
+        // Optionally: send candidates via signaling (not needed in simple setup)
       }
     };
 
-    // Geyma offer í global scope (til að debugga ef villur koma upp)
-    window.peerConnection = peerConnection;
-
-  } catch (error) {
-    console.error("Dómari: Villa við að starta streymi:", error);
+  } catch (err) {
+    console.error("Villa í startStreaming:", err);
   }
 };
 
 export const joinStreaming = async (roomId) => {
   try {
-    console.log("Keppandi: Tengist streymi í room:", roomId);
-
-    peerConnection = new RTCPeerConnection(config);
+    peerConnection = new RTCPeerConnection(servers);
 
     peerConnection.ontrack = (event) => {
-      const remoteStream = new MediaStream();
-      remoteStream.addTrack(event.track);
-
-      const audioElement = new Audio();
-      audioElement.srcObject = remoteStream;
-      audioElement.autoplay = true;
-      audioElement.play();
+      const remoteVideo = document.createElement("video");
+      remoteVideo.srcObject = event.streams[0];
+      remoteVideo.autoplay = true;
+      remoteVideo.controls = true;
+      remoteVideo.className = "fixed bottom-4 right-4 w-1/4 border-4 border-white z-50";
+      document.body.appendChild(remoteVideo);
     };
 
-    // Ekki fleiri tilraunir – hér vantar signaling (backend/firestore eða WebSocket)
-    // Þetta er placeholder eða forsenda fyrir að búa til alvöru offer/answer samskipti
+    const offerRef = doc(db, "rooms", roomId, "webrtc", "offer");
+    const offerSnap = await onSnapshot(offerRef, async (docSnap) => {
+      const data = docSnap.data();
+      if (data && data.type === "offer") {
+        const remoteDesc = new RTCSessionDescription(data);
+        await peerConnection.setRemoteDescription(remoteDesc);
 
-  } catch (error) {
-    console.error("Keppandi: Villa við að tengjast streymi:", error);
+        const answer = await peerConnection.createAnswer();
+        await peerConnection.setLocalDescription(answer);
+
+        await setDoc(doc(db, "rooms", roomId, "webrtc", "answer"), {
+          sdp: answer.sdp,
+          type: answer.type,
+        });
+      }
+    });
+  } catch (err) {
+    console.error("Villa í joinStreaming:", err);
   }
 };
 
 export const toggleMic = () => {
-  if (!localStream) return false;
-  const audioTracks = localStream.getAudioTracks();
-  if (audioTracks.length === 0) return false;
-
-  const currentState = audioTracks[0].enabled;
-  audioTracks[0].enabled = !currentState;
-  return !currentState;
+  if (localStream) {
+    const audioTrack = localStream.getAudioTracks()[0];
+    audioTrack.enabled = !audioTrack.enabled;
+    return audioTrack.enabled;
+  }
+  return false;
 };
