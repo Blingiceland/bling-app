@@ -1,104 +1,100 @@
 // webrtc.js
-import { doc, onSnapshot, updateDoc } from "firebase/firestore";
-import { db } from "./firebase";
-
 let peerConnection;
-let localStream;
-let remoteStream;
-let isMicOn = true;
+let stream;
 
-const config = {
-  iceServers: [
-    { urls: "stun:stun.l.google.com:19302" },
-  ],
-};
-
-export const startStreaming = async (roomId) => {
-  peerConnection = new RTCPeerConnection(config);
-
-  localStream = await navigator.mediaDevices.getDisplayMedia({
-    video: true,
-    audio: true,
-  });
-
-  remoteStream = new MediaStream();
-  localStream.getTracks().forEach((track) => {
-    peerConnection.addTrack(track, localStream);
-  });
-
-  peerConnection.ontrack = (event) => {
-    event.streams[0].getTracks().forEach((track) => {
-      remoteStream.addTrack(track);
+export async function startStreaming(roomId) {
+  try {
+    const displayStream = await navigator.mediaDevices.getDisplayMedia({
+      video: true,
+      audio: true  // tekur system sound ef browser styður það
     });
-  };
 
-  peerConnection.onicecandidate = async (event) => {
-    if (event.candidate) return;
-    const offer = peerConnection.localDescription;
-    const roomRef = doc(db, "rooms", roomId);
-    await updateDoc(roomRef, { offer: JSON.stringify(offer) });
-    console.log("Dómari: Byrjar streymi fyrir room:", roomId);
-  };
-
-  const offer = await peerConnection.createOffer();
-  await peerConnection.setLocalDescription(offer);
-
-  const roomRef = doc(db, "rooms", roomId);
-  onSnapshot(roomRef, async (snapshot) => {
-    const data = snapshot.data();
-    if (!peerConnection.currentRemoteDescription && data?.answer) {
-      try {
-        const answer = JSON.parse(data.answer);
-        await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
-        console.log("Dómari: remote description sett.");
-      } catch (err) {
-        console.error("Villa við að setja remote description:", err);
-      }
-    }
-  });
-};
-
-export const joinStreaming = async (roomId) => {
-  peerConnection = new RTCPeerConnection(config);
-  remoteStream = new MediaStream();
-
-  peerConnection.ontrack = (event) => {
-    event.streams[0].getTracks().forEach((track) => {
-      remoteStream.addTrack(track);
+    const micStream = await navigator.mediaDevices.getUserMedia({
+      audio: true
     });
-    const remoteAudio = new Audio();
-    remoteAudio.srcObject = remoteStream;
-    remoteAudio.play();
-  };
 
-  const roomRef = doc(db, "rooms", roomId);
-  const roomSnap = await onSnapshot(roomRef, async (snapshot) => {
-    const data = snapshot.data();
-    if (data?.offer && !peerConnection.currentRemoteDescription) {
-      try {
-        const offer = JSON.parse(data.offer);
-        await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+    // Sameina mic við display stream (bætir við audio tracks)
+    micStream.getAudioTracks().forEach((track) => {
+      displayStream.addTrack(track);
+    });
 
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        stream.getTracks().forEach((track) => peerConnection.addTrack(track, stream));
-        localStream = stream;
+    stream = displayStream;
+    peerConnection = new RTCPeerConnection();
 
-        const answer = await peerConnection.createAnswer();
-        await peerConnection.setLocalDescription(answer);
-        await updateDoc(roomRef, { answer: JSON.stringify(answer) });
-        console.log("Keppandi: Sendi answer aftur í room:", roomId);
-      } catch (err) {
-        console.error("Keppandi: Villa í offer svarferli:", err);
-      }
+    stream.getTracks().forEach(track => {
+      peerConnection.addTrack(track, stream);
+    });
+
+    const offer = await peerConnection.createOffer();
+    await peerConnection.setLocalDescription(offer);
+
+    const offerString = JSON.stringify(offer);
+    const remoteAnswer = prompt(`Afritaðu og sendu keppanda þetta OFFER:\n\n${offerString}`);
+
+    if (remoteAnswer) {
+      const answerDesc = new RTCSessionDescription(JSON.parse(remoteAnswer));
+      await peerConnection.setRemoteDescription(answerDesc);
+      console.log("Dómari: Tengdur keppanda!");
     }
-  });
-};
 
-export const toggleMic = () => {
-  if (!localStream) return isMicOn;
-  localStream.getAudioTracks().forEach((track) => {
-    track.enabled = !track.enabled;
-  });
-  isMicOn = !isMicOn;
-  return isMicOn;
-};
+    peerConnection.onicecandidate = (event) => {
+      if (event.candidate) {
+        console.log("Dómari: ICE candidate", event.candidate);
+      }
+    };
+
+  } catch (err) {
+    console.error("Villa við að starta streymi:", err);
+  }
+}
+
+export async function joinStreaming(roomId) {
+  try {
+    const micStream = await navigator.mediaDevices.getUserMedia({
+      audio: true
+    });
+
+    stream = micStream;
+    peerConnection = new RTCPeerConnection();
+
+    stream.getTracks().forEach(track => {
+      peerConnection.addTrack(track, stream);
+    });
+
+    const offerString = prompt("Limdu OFFER frá dómara hér:");
+    if (!offerString) return;
+
+    const offerDesc = new RTCSessionDescription(JSON.parse(offerString));
+    await peerConnection.setRemoteDescription(offerDesc);
+
+    const answer = await peerConnection.createAnswer();
+    await peerConnection.setLocalDescription(answer);
+
+    const answerString = JSON.stringify(answer);
+    alert(`Sendu þetta til baka til dómara:\n\n${answerString}`);
+
+    peerConnection.ontrack = (event) => {
+      const remoteStream = event.streams[0];
+      const audio = document.createElement("audio");
+      audio.srcObject = remoteStream;
+      audio.autoplay = true;
+      document.body.appendChild(audio);
+    };
+
+    peerConnection.onicecandidate = (event) => {
+      if (event.candidate) {
+        console.log("Keppandi: ICE candidate", event.candidate);
+      }
+    };
+  } catch (err) {
+    console.error("Villa við að tengjast streymi:", err);
+  }
+}
+
+export function toggleMic() {
+  if (!stream) return;
+  const audioTracks = stream.getAudioTracks();
+  const enabled = !audioTracks[0].enabled;
+  audioTracks.forEach(track => track.enabled = enabled);
+  return enabled;
+}
