@@ -17,7 +17,7 @@ export async function createDailyRoom() {
           enable_chat: false,
           start_video_off: true,
           start_audio_off: false,
-          exp: Math.floor(Date.now() / 1000) + 3600 // 1 klst líftími
+          exp: Math.floor(Date.now() / 1000) + 3600
         }
       })
     });
@@ -36,7 +36,7 @@ export async function createDailyRoom() {
   }
 }
 
-// 🎧 Hljóðstreymi með sameinuðu hljóði (mic + system/browser tab)
+// 🎧 Streymi með aðeins hljóði – engin skjámynd send
 export async function startDailyCallWithAudioOnly(roomId, db) {
   const url = await createDailyRoom();
   if (!url) {
@@ -44,24 +44,27 @@ export async function startDailyCallWithAudioOnly(roomId, db) {
     return;
   }
 
-  // Skrá herbergishlekk í Firestore
   const roomRef = doc(db, "rooms", roomId);
   await updateDoc(roomRef, {
     streamingActive: true,
     dailyRoomUrl: url
   });
 
-  // Búa til Daily call object
   const callObject = DailyIframe.createCallObject();
   await callObject.join({ url, videoSource: false });
 
   try {
     // Grípa mic hljóð
     const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+    // Grípa tab/system audio + video (video þarf að vera til svo við fáum audio)
     const displayStream = await navigator.mediaDevices.getDisplayMedia({
-      video: false,
+      video: true, // leyfa browsernum að velja tab/skjá
       audio: true
     });
+
+    // 👉 Fjarlægja video trackið STRAX
+    displayStream.getVideoTracks().forEach((track) => track.stop());
 
     const AudioContext = window.AudioContext || window.webkitAudioContext;
     const audioContext = new AudioContext();
@@ -73,14 +76,14 @@ export async function startDailyCallWithAudioOnly(roomId, db) {
     micSource.connect(destination);
     tabSource.connect(destination);
 
-    // ✅ Bæta við aðeins audio tracks – engin video track fer í streymi
+    // ✅ Bæta aðeins við audio track
     destination.stream.getTracks().forEach((track) => {
       if (track.kind === "audio") {
         callObject.addTrack(track);
       }
     });
 
-    console.log("🎧 Mic + tab/system audio sent to Daily (audio-only)");
+    console.log("✅ Audio-only streymi virkt (mic + tab) – video fjarlægt");
   } catch (error) {
     console.error("❌ Villa við hljóðdeilingu:", error);
   }
