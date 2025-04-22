@@ -103,15 +103,19 @@ export async function joinStreaming(roomId) {
     await setDoc(roomDocRef, {
       offer,
       answer,
-    });
-
-    peerConnection.onicecandidate = async (event) => {
-      if (event.candidate) {
-        const candidatesRef = collection(db, "rooms", roomId, "calleeCandidates");
-        await addDoc(candidatesRef, event.candidate.toJSON());
-      }
-    };
-
+      peerConnection.ontrack = (event) => {
+        const [remoteStream] = event.streams;
+        if (!remoteStream) return;
+      
+        const audio = document.createElement("audio");
+        audio.srcObject = remoteStream;
+        audio.autoplay = true;
+        audio.controls = true; // Bætum við player svo þú getir prófað að ýta á play
+        document.body.appendChild(audio);
+      
+        console.log("Keppandi: Heyri remote track:", event.track.kind);
+      };
+    
     peerConnection.ontrack = (event) => {
       const remoteStream = event.streams[0];
       const audio = document.createElement("audio");
