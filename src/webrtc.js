@@ -3,6 +3,7 @@ import { db } from "./firebase";
 import {
   doc,
   setDoc,
+  updateDoc,
   onSnapshot,
   getDoc,
   collection,
@@ -39,14 +40,25 @@ export async function startStreaming(roomId) {
     const roomRef = doc(db, "rooms", roomId);
     await setDoc(roomRef, { offer });
 
-    console.log("Dómari: Byrjar streymi fyrir room:", roomId);
+    console.log("🎬 Dómari: Byrjar streymi fyrir room:", roomId);
 
     onSnapshot(roomRef, async (snapshot) => {
       const data = snapshot.data();
       if (data?.answer && !peerConnection.currentRemoteDescription) {
         await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
-        console.log("Dómari: Tengdur keppanda!");
+        console.log("✅ Dómari: Tengdur keppanda!");
       }
+    });
+
+    const calleeCandidatesRef = collection(db, "rooms", roomId, "calleeCandidates");
+    onSubcollectionSnapshot(calleeCandidatesRef, (snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === "added") {
+          const candidate = new RTCIceCandidate(change.doc.data());
+          peerConnection.addIceCandidate(candidate);
+          console.log("🎤 Dómari fékk ICE candidate frá keppanda");
+        }
+      });
     });
 
     peerConnection.onicecandidate = async (event) => {
@@ -56,7 +68,7 @@ export async function startStreaming(roomId) {
       }
     };
   } catch (err) {
-    console.error("Villa við að starta streymi:", err);
+    console.error("🚨 Villa við að starta streymi:", err);
   }
 }
 
@@ -73,7 +85,7 @@ export async function joinStreaming(roomId) {
     const roomDocRef = doc(db, "rooms", roomId);
     const roomDoc = await getDoc(roomDocRef);
     if (!roomDoc.exists()) {
-      throw new Error("Streymi ekki fundið fyrir þetta herbergi.");
+      throw new Error("❌ Streymi ekki fundið fyrir þetta herbergi.");
     }
 
     const offer = roomDoc.data().offer;
@@ -82,10 +94,7 @@ export async function joinStreaming(roomId) {
     const answer = await peerConnection.createAnswer();
     await peerConnection.setLocalDescription(answer);
 
-    await setDoc(roomDocRef, {
-      offer,
-      answer,
-    });
+    await updateDoc(roomDocRef, { answer });
 
     peerConnection.onicecandidate = async (event) => {
       if (event.candidate) {
@@ -100,6 +109,7 @@ export async function joinStreaming(roomId) {
       audio.srcObject = remoteStream;
       audio.autoplay = true;
       document.body.appendChild(audio);
+      console.log("🔊 Keppandi: Spila fjartengt hljóð");
     };
 
     const callerCandidatesRef = collection(db, "rooms", roomId, "callerCandidates");
@@ -108,11 +118,12 @@ export async function joinStreaming(roomId) {
         if (change.type === "added") {
           const candidate = new RTCIceCandidate(change.doc.data());
           peerConnection.addIceCandidate(candidate);
+          console.log("🎤 Keppandi fékk ICE candidate frá dómara");
         }
       });
     });
   } catch (err) {
-    console.error("Villa við að tengjast streymi:", err);
+    console.error("🚨 Villa við að tengjast streymi:", err);
   }
 }
 
