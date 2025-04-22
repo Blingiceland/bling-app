@@ -22,6 +22,8 @@ export async function startStreaming(roomId) {
     });
 
     const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+    // Sameina system audio + mic í einn stream
     micStream.getAudioTracks().forEach((track) => {
       displayStream.addTrack(track);
     });
@@ -31,6 +33,7 @@ export async function startStreaming(roomId) {
 
     stream.getTracks().forEach((track) => {
       peerConnection.addTrack(track, stream);
+      console.log("Sendandi track:", track.kind, "enabled:", track.enabled);
     });
 
     const offer = await peerConnection.createOffer();
@@ -41,7 +44,6 @@ export async function startStreaming(roomId) {
 
     console.log("Dómari: Byrjar streymi fyrir room:", roomId);
 
-    // Listen for answer
     onSnapshot(roomRef, async (snapshot) => {
       const data = snapshot.data();
       if (data?.answer && !peerConnection.currentRemoteDescription) {
@@ -50,13 +52,16 @@ export async function startStreaming(roomId) {
       }
     });
 
-    // Send ICE candidates
     peerConnection.onicecandidate = async (event) => {
       if (event.candidate) {
         const candidatesRef = collection(db, "rooms", roomId, "callerCandidates");
         await addDoc(candidatesRef, event.candidate.toJSON());
       }
     };
+  } catch (err) {
+    console.error("Villa við að starta streymi:", err);
+  }
+}
   } catch (err) {
     console.error("Villa við að starta streymi:", err);
   }
