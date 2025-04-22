@@ -18,12 +18,11 @@ export async function startStreaming(roomId) {
   try {
     const displayStream = await navigator.mediaDevices.getDisplayMedia({
       video: true,
-      audio: true, // Þetta nær system sound ef leyft
+      audio: true,
     });
 
     const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-    // Sameina system sound og mic með AudioContext
     const audioContext = new AudioContext();
     const destination = audioContext.createMediaStreamDestination();
 
@@ -69,10 +68,6 @@ export async function startStreaming(roomId) {
         await addDoc(candidatesRef, event.candidate.toJSON());
       }
     };
-
-    peerConnection.ontrack = (event) => {
-      console.log("Dómari fékk remote track:", event.track.kind);
-    };
   } catch (err) {
     console.error("Villa við að starta streymi:", err);
   }
@@ -103,28 +98,27 @@ export async function joinStreaming(roomId) {
     await setDoc(roomDocRef, {
       offer,
       answer,
-      peerConnection.ontrack = (event) => {
-        const [remoteStream] = event.streams;
-        if (!remoteStream) return;
-      
-        const audio = document.createElement("audio");
-        audio.srcObject = remoteStream;
-        audio.autoplay = true;
-        audio.controls = true;
-        document.body.appendChild(audio);
-      
-        console.log("Keppandi: Heyri remote track:", event.track.kind);
-      };
-      
+    });
 
-    peerConnection.ontrack = (event) => {
-      const remoteStream = event.streams[0];
-      const audio = document.createElement("audio");
-      audio.srcObject = remoteStream;
-      audio.autoplay = true;
-      document.body.appendChild(audio);
-      console.log("Keppandi: Heyri remote track:", event.track.kind);
+    peerConnection.onicecandidate = async (event) => {
+      if (event.candidate) {
+        const candidatesRef = collection(db, "rooms", roomId, "calleeCandidates");
+        await addDoc(candidatesRef, event.candidate.toJSON());
+      }
     };
+
+    const remoteStream = new MediaStream();
+    peerConnection.ontrack = (event) => {
+      event.streams[0].getTracks().forEach((track) => {
+        remoteStream.addTrack(track);
+      });
+    };
+
+    const audioElement = document.createElement("audio");
+    audioElement.srcObject = remoteStream;
+    audioElement.autoplay = true;
+    document.body.appendChild(audioElement);
+    console.log("Keppandi: Bæti við audio player");
 
     const callerCandidatesRef = collection(db, "rooms", roomId, "callerCandidates");
     onSubcollectionSnapshot(callerCandidatesRef, (snapshot) => {
