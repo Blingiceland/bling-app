@@ -17,7 +17,7 @@ export async function createDailyRoom() {
           enable_chat: false,
           start_video_off: true,
           start_audio_off: false,
-          exp: Math.floor(Date.now() / 1000) + 3600
+          exp: Math.floor(Date.now() / 1000) + 3600 // 1 klst líftími
         }
       })
     });
@@ -54,16 +54,14 @@ export async function startDailyCallWithAudioOnly(roomId, db) {
   await callObject.join({ url, videoSource: false });
 
   try {
-    // Grípa mic hljóð
     const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-    // Grípa tab/system audio + video (video þarf að vera til svo við fáum audio)
     const displayStream = await navigator.mediaDevices.getDisplayMedia({
-      video: true, // leyfa browsernum að velja tab/skjá
+      video: true,
       audio: true
     });
 
-    // 👉 Fjarlægja video trackið STRAX
+    // Fjarlægja video track strax
     displayStream.getVideoTracks().forEach((track) => track.stop());
 
     const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -76,7 +74,6 @@ export async function startDailyCallWithAudioOnly(roomId, db) {
     micSource.connect(destination);
     tabSource.connect(destination);
 
-    // ✅ Bæta aðeins við audio track
     destination.stream.getTracks().forEach((track) => {
       if (track.kind === "audio") {
         callObject.addTrack(track);
@@ -88,5 +85,7 @@ export async function startDailyCallWithAudioOnly(roomId, db) {
     console.error("❌ Villa við hljóðdeilingu:", error);
   }
 
-  window.open(url, "_blank");
+  // ✅ Bæta við audio-only param til að fela video UI
+  const audioOnlyUrl = `${url}?startAudioOnly=true`;
+  window.open(audioOnlyUrl, "_blank");
 }
