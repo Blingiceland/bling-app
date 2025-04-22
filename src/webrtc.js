@@ -39,6 +39,8 @@ export async function startStreaming(roomId) {
       ...mixedAudioStream.getAudioTracks(),
     ]);
 
+    console.log("Dómari: Audio tracks:", mixedAudioStream.getAudioTracks());
+
     stream = combinedStream;
     peerConnection = new RTCPeerConnection();
 
@@ -67,6 +69,10 @@ export async function startStreaming(roomId) {
         const candidatesRef = collection(db, "rooms", roomId, "callerCandidates");
         await addDoc(candidatesRef, event.candidate.toJSON());
       }
+    };
+
+    peerConnection.ontrack = (event) => {
+      console.log("Dómari fékk remote track:", event.track.kind);
     };
   } catch (err) {
     console.error("Villa við að starta streymi:", err);
@@ -107,18 +113,23 @@ export async function joinStreaming(roomId) {
       }
     };
 
-    const remoteStream = new MediaStream();
     peerConnection.ontrack = (event) => {
-      event.streams[0].getTracks().forEach((track) => {
-        remoteStream.addTrack(track);
-      });
-    };
+      const remoteStream = event.streams[0];
+      console.log("Keppandi fékk remote stream:", remoteStream);
+      console.log("Audio tracks:", remoteStream.getAudioTracks());
 
-    const audioElement = document.createElement("audio");
-    audioElement.srcObject = remoteStream;
-    audioElement.autoplay = true;
-    document.body.appendChild(audioElement);
-    console.log("Keppandi: Bæti við audio player");
+      const audio = document.createElement("audio");
+      audio.srcObject = remoteStream;
+      audio.autoplay = true;
+      audio.controls = true;
+
+      audio.onloadedmetadata = () => {
+        audio.play().catch((e) => console.error("Audio play error:", e));
+      };
+
+      document.body.appendChild(audio);
+      console.log("Keppandi: bæti við audio player");
+    };
 
     const callerCandidatesRef = collection(db, "rooms", roomId, "callerCandidates");
     onSubcollectionSnapshot(callerCandidatesRef, (snapshot) => {
