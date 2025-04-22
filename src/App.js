@@ -1,5 +1,4 @@
-// App.js
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { db } from "./firebase";
 import {
   collection,
@@ -10,10 +9,9 @@ import {
   setDoc,
   updateDoc,
   onSnapshot,
-  serverTimestamp,
-  increment
+  serverTimestamp
 } from "firebase/firestore";
-import { startStreaming, joinStreaming, toggleMic } from "./webrtc";
+import { startDailyCallWithAudioOnly } from "./daily";
 
 function App() {
   const [mode, setMode] = useState(null);
@@ -24,13 +22,19 @@ function App() {
   const [firstBling, setFirstBling] = useState(null);
   const [players, setPlayers] = useState({});
   const [timer, setTimer] = useState(null);
-  const [micOn, setMicOn] = useState(true);
+  const [streamingActive, setStreamingActive] = useState(false);
+
+  const blingSoundRef = useRef(null);
+
+  useEffect(() => {
+    blingSoundRef.current = new Audio("/bling.mp3");
+  }, []);
 
   useEffect(() => {
     let countdown;
     if (firstBling) {
       setTimer(15);
-      countdown = setInterval(async () => {
+      countdown = setInterval(() => {
         setTimer((prev) => {
           if (prev === 1) {
             clearInterval(countdown);
@@ -49,9 +53,7 @@ function App() {
   const handleTimeOut = async () => {
     if (roomId) {
       const roomRef = doc(db, "rooms", roomId);
-      await updateDoc(roomRef, {
-        firstBling: null
-      });
+      await updateDoc(roomRef, { firstBling: null });
     }
   };
 
@@ -60,7 +62,9 @@ function App() {
       const roomRef = doc(db, "rooms", roomId);
       const unsubRoom = onSnapshot(roomRef, (docSnap) => {
         if (docSnap.exists()) {
-          setFirstBling(docSnap.data().firstBling);
+          const data = docSnap.data();
+          setFirstBling(data.firstBling);
+          setStreamingActive(data.streamingActive || false);
         }
       });
 
@@ -106,8 +110,8 @@ function App() {
         const playersRef = collection(db, "rooms", inputRoomId, "players");
         const playersSnap = await getDocs(playersRef);
 
-        if (playersSnap.size >= 2) {
-          alert("⚠️ Fullt í herberginu – aðeins tveir keppendur í einu.");
+        if (playersSnap.size >= 4) {
+          alert("⚠️ Fullt í herberginu – hámark 4 keppendur.");
           return;
         }
 
@@ -133,91 +137,176 @@ function App() {
       const roomSnap = await getDoc(roomRef);
 
       if (roomSnap.exists() && !roomSnap.data().firstBling) {
-        await updateDoc(roomRef, {
-          firstBling: playerName
-        });
+        await updateDoc(roomRef, { firstBling: playerName });
+        if (blingSoundRef.current) {
+          blingSoundRef.current.currentTime = 0;
+          blingSoundRef.current.play();
+        }
       }
     } catch (error) {
       console.error("Villa við BLING:", error);
     }
   };
 
-  const clearBling = async () => {
-    if (roomId) {
-      const roomRef = doc(db, "rooms", roomId);
-      await updateDoc(roomRef, { firstBling: null });
-    }
-  };
-
-  const addScore = async (name, points) => {
-    if (roomId) {
+  const addPoint = async (name) => {
+    try {
       const playerRef = doc(db, "rooms", roomId, "players", name);
-      await updateDoc(playerRef, { score: increment(points) });
-      await clearBling();
+      const playerSnap = await getDoc(playerRef);
+      if (playerSnap.exists()) {
+        const currentScore = playerSnap.data().score || 0;
+        await updateDoc(playerRef, { score: currentScore + 1 });
+      }
+    } catch (error) {
+      console.error("Villa við að bæta stig:", error);
     }
   };
 
-  const toggleMicHandler = () => {
-    const isNowOn = toggleMic();
-    setMicOn(isNowOn);
+  const subtractPoint = async (name) => {
+    try {
+      const playerRef = doc(db, "rooms", roomId, "players", name);
+      const playerSnap = await getDoc(playerRef);
+      if (playerSnap.exists()) {
+        const currentScore = playerSnap.data().score || 0;
+        await updateDoc(playerRef, { score: currentScore - 1 });
+      }
+    } catch (error) {
+      console.error("Villa við að draga frá stigi:", error);
+    }
   };
+
+  const baseStyle = {
+    background: "radial-gradient(circle, #222 0%, #000 100%)",
+    color: "#fff",
+    textAlign: "center",
+    minHeight: "100vh",
+    padding: "50px",
+    fontFamily: "'Press Start 2P', cursive"
+  };
+
+  const buttonStyle = {
+    fontSize: "1.2em",
+    padding: "10px 30px",
+    margin: "10px",
+    cursor: "pointer",
+    backgroundColor: "#ffcc00",
+    border: "none",
+    borderRadius: "8px",
+    fontFamily: "'Press Start 2P', cursive"
+  };
+
+  const inputStyle = {
+    padding: 12,
+    fontSize: "1.5em",
+    margin: "10px 0",
+    width: "80%",
+    maxWidth: "300px",
+    color: "black"
+  };
+
+  const renderTimer = () => {
+    if (firstBling && timer !== null) {
+      return timer > 0
+        ? <p>⏱ {timer} sekúndur eftir til að svara</p>
+        : <p style={{ color: "red" }}>⏰ Tíminn er úti!</p>;
+    }
+    return null;
+  };
+
+  const renderPlayerList = () => (
+    <>
+      <h3 style={{ marginTop: "30px" }}>📋 Keppendur í herberginu:</h3>
+      <ul style={{ listStyle: "none", padding: 0 }}>
+        {Object.keys(players).map((name) => (
+          <li key={name}>👤 {name}</li>
+        ))}
+      </ul>
+    </>
+  );
+
+  const renderScoreboard = () => (
+    <>
+      <h3 style={{ marginTop: "30px" }}>🏅 Stigatafla:</h3>
+      <ul style={{ listStyle: "none", padding: 0 }}>
+        {Object.entries(players).map(([name, score]) => (
+          <li key={name}>
+            {name}: <strong>{score}</strong>
+            <button onClick={() => addPoint(name)} style={{ marginLeft: 10 }}>+1</button>
+            <button onClick={() => subtractPoint(name)} style={{ marginLeft: 5 }}>-1</button>
+          </li>
+        ))}
+      </ul>
+    </>
+  );
 
   if (!mode) {
     return (
-      <div className="text-center p-6">
-        <h1 className="text-4xl font-bold mb-4">Bling 🎵</h1>
-        <button onClick={() => setMode("host")} className="mr-4 bg-yellow-400 px-4 py-2 rounded">Ég er dómari</button>
-        <button onClick={() => setMode("player")} className="bg-green-400 px-4 py-2 rounded">Ég er keppandi</button>
+      <div style={baseStyle}>
+        <h1 style={{ fontSize: "2.5em", marginBottom: "30px" }}>🎉 BLING 🎉</h1>
+        <button onClick={() => setMode("host")} style={buttonStyle}>Ég er dómari</button>
+        <button onClick={() => setMode("player")} style={buttonStyle}>Ég er keppandi</button>
       </div>
     );
   }
 
   if (mode === "host") {
     return (
-      <div className="text-center p-6 min-h-screen bg-gradient-to-b from-purple-800 to-black text-white">
-        <h1 className="text-4xl font-extrabold mb-2">Dómari 🎧</h1>
-        <button onClick={createRoom} className="bg-yellow-500 hover:bg-yellow-600 px-6 py-3 text-xl rounded mb-4">Stofna nýtt herbergi</button>
+      <div style={baseStyle}>
+        <h1 style={{ fontSize: "2em" }}>🎤 Dómari</h1>
+        {!roomId && (
+          <button onClick={createRoom} style={buttonStyle}>Stofna nýtt herbergi</button>
+        )}
         {roomId && (
           <>
-            <p className="text-lg">Herbergi ID: <span className="font-mono bg-white text-black px-2 py-1 rounded select-all">{roomId}</span></p>
-            {firstBling && (
+            <p>🔑 Herbergi ID: <strong>{roomId}</strong></p>
+            <button onClick={() => startDailyCallWithAudioOnly(roomId, db)} style={buttonStyle}>Byrja streymi</button>
+
+            {!streamingActive && (
+              <div style={{
+                backgroundColor: "#fff3cd",
+                color: "#856404",
+                padding: "10px 20px",
+                borderRadius: "6px",
+                marginTop: "20px",
+                maxWidth: "500px",
+                fontSize: "0.9em",
+                lineHeight: "1.5em",
+                marginLeft: "auto",
+                marginRight: "auto"
+              }}>
+                💡 <strong>Til að spila tónlist fyrir keppendur:</strong><br />
+                Þegar þú smellir á "Byrja streymi", veldu "Browser tab" og <strong>hakkaðu við “Share tab audio”</strong>.<br />
+                <br />
+                ✅ Chrome virkar best.<br />
+                ❌ Ekki hægt að deila bara hljóði án þess að velja skjá eða tab.
+              </div>
+            )}
+
+            {streamingActive && (
+              <div style={{
+                backgroundColor: "#d4edda",
+                color: "#155724",
+                padding: "10px",
+                borderRadius: "5px",
+                marginTop: "15px",
+                maxWidth: "500px",
+                margin: "0 auto"
+              }}>
+                ✅ Streymi virkt – keppendur heyra þig!
+                <p style={{ fontSize: "0.8em", marginTop: "10px", color: "#155724" }}>
+                  👂 Mundu að velja tab með hljóði og haka við “Share tab audio”. Chrome virkar best!
+                </p>
+              </div>
+            )}
+            {firstBling ? (
               <>
-                <p className="mt-4 text-2xl text-red-400 font-bold animate-pulse">🔔 {firstBling} hefur BLINGAÐ!</p>
-                <div className="flex justify-center gap-3 mt-2">
-                  <button onClick={() => addScore(firstBling, 1)} className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded">+1 stig</button>
-                  <button onClick={() => addScore(firstBling, 2)} className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded">+2 stig</button>
-                  <button onClick={() => addScore(firstBling, -1)} className="bg-red-700 hover:bg-red-800 px-4 py-2 rounded">-1 stig</button>
-                </div>
+                <h2 style={{ color: "#ffcc00" }}>🔔 Fyrsti til að BLINGA: {firstBling}</h2>
+                {renderTimer()}
               </>
+            ) : (
+              <h2>⏳ Beðið eftir BLING...</h2>
             )}
-            {timer !== null && (
-              <p className="text-yellow-300 text-lg font-bold mt-2">⏱ {timer} sekúndur eftir</p>
-            )}
-            <div className="mt-2">
-              <button onClick={clearBling} className="bg-red-400 px-3 py-1 rounded">Núlstilla BLING</button>
-            </div>
-            <div className="mt-6">
-              <h3 className="text-2xl font-bold underline mb-2">🎯 Stigatafla</h3>
-              <ul className="flex flex-col items-center gap-2">
-                {Object.entries(players).map(([name, score]) => (
-                  <li key={name} className="bg-white rounded shadow-md w-64 px-4 py-2 flex justify-between items-center">
-                    <span className="text-black">{name}: {score} stig</span>
-                    <div className="flex gap-1">
-                      <button onClick={() => addScore(name, 1)} className="bg-green-500 text-white px-2 py-1 rounded">+1</button>
-                      <button onClick={() => addScore(name, -1)} className="bg-red-600 text-white px-2 py-1 rounded">-1</button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div className="mt-6">
-              <button onClick={() => startStreaming(roomId)} className="bg-blue-500 px-4 py-2 rounded mr-2">
-                🎙️ Byrja streymi
-              </button>
-              <button onClick={toggleMicHandler} className="bg-gray-600 px-4 py-2 rounded">
-                {micOn ? "🔇 Slökkva á mic" : "🎤 Kveikja á mic"}
-              </button>
-            </div>
+            {renderPlayerList()}
+            {renderScoreboard()}
           </>
         )}
       </div>
@@ -226,51 +315,50 @@ function App() {
 
   if (mode === "player") {
     return (
-      <div className="text-center p-6 min-h-screen bg-gradient-to-b from-black to-purple-800 text-white">
-        <h1 className="text-4xl font-bold mb-4">Keppandi 🧍</h1>
+      <div style={baseStyle}>
+        <h1 style={{ fontSize: "2em" }}>🧍 Keppandi</h1>
         {!joined ? (
           <>
-            <input
-              type="text"
-              placeholder="Nafn"
-              value={playerName}
-              onChange={(e) => setPlayerName(e.target.value)}
-              className="block mx-auto mb-2 px-4 py-2 text-black rounded"
-            />
-            <input
-              type="text"
-              placeholder="Herbergi ID"
-              value={inputRoomId}
-              onChange={(e) => setInputRoomId(e.target.value)}
-              className="block mx-auto mb-2 px-4 py-2 text-black rounded"
-            />
-            <button onClick={joinRoom} className="bg-green-500 px-4 py-2 rounded">Taka þátt</button>
+            <input style={inputStyle} type="text" placeholder="Nafn" value={playerName} onChange={(e) => setPlayerName(e.target.value)} />
+            <br />
+            <input style={inputStyle} type="text" placeholder="Herbergi ID" value={inputRoomId} onChange={(e) => setInputRoomId(e.target.value)} />
+            <br />
+            <button onClick={joinRoom} style={buttonStyle}>Taka þátt</button>
           </>
         ) : (
           <>
-            <p className="mb-1">Þú ert kominn í herbergi: <strong>{roomId}</strong></p>
-            <p className="mb-2">Nafn: <strong>{playerName}</strong></p>
-            <button onClick={sendBling} className="mt-2 bg-red-600 px-6 py-3 rounded text-white text-xl animate-pulse">🚨 BLING! 🚨</button>
-            <button onClick={() => joinStreaming(roomId)} className="mt-4 bg-blue-500 px-4 py-2 rounded">🎧 Tengjast streymi</button>
-            <button onClick={toggleMicHandler} className="mt-2 ml-2 bg-gray-500 px-4 py-2 rounded">
-              {micOn ? "🔇 Slökkva á mic" : "🎤 Kveikja á mic"}
-            </button>
+            <p>Herbergi: <strong>{roomId}</strong></p>
+            <p>Nafn: <strong>{playerName}</strong></p>
+
+            {streamingActive && (
+              <button
+                style={buttonStyle}
+                onClick={async () => {
+                  const roomRef = doc(db, "rooms", roomId);
+                  const roomSnap = await getDoc(roomRef);
+                  if (roomSnap.exists()) {
+                    const url = roomSnap.data().dailyRoomUrl;
+                    if (url) window.open(url, "_blank");
+                    else alert("Engin streymistengill fannst.");
+                  }
+                }}
+              >
+                🔊 Opna streymi
+              </button>
+            )}
+
+            <button onClick={sendBling} style={buttonStyle}>🚨 BLING! 🚨</button>
+
             {firstBling && (
-              <p className="mt-4 text-xl text-red-400">🔔 {firstBling} hefur blingað!</p>
+              <>
+                <p style={{ fontSize: "20px", color: "red", marginTop: "20px" }}>
+                  🔔 {firstBling} hefur blingað!
+                </p>
+                {renderTimer()}
+              </>
             )}
-            {timer !== null && (
-              <p className="mt-2 text-yellow-300">
-                {timer > 0 ? `⏱ ${timer} sekúndur eftir til að svara` : "⏰ Tíminn er úti!"}
-              </p>
-            )}
-            <div className="mt-6">
-              <h3 className="text-xl font-bold">Stigatafla:</h3>
-              <ul className="mt-2">
-                {Object.entries(players).map(([name, score]) => (
-                  <li key={name}>{name}: {score} stig</li>
-                ))}
-              </ul>
-            </div>
+            {renderPlayerList()}
+            {renderScoreboard()}
           </>
         )}
       </div>
