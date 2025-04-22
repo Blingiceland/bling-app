@@ -110,12 +110,13 @@ export async function joinStreaming(roomId) {
         const audio = document.createElement("audio");
         audio.srcObject = remoteStream;
         audio.autoplay = true;
-        audio.controls = true; // Bætum við player svo þú getir prófað að ýta á play
+        audio.controls = true;
         document.body.appendChild(audio);
       
         console.log("Keppandi: Heyri remote track:", event.track.kind);
       };
-    
+      
+
     peerConnection.ontrack = (event) => {
       const remoteStream = event.streams[0];
       const audio = document.createElement("audio");
