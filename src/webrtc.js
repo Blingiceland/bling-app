@@ -22,8 +22,6 @@ export async function startStreaming(roomId) {
     });
 
     const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-
-    // Sameina system audio + mic í einn stream
     micStream.getAudioTracks().forEach((track) => {
       displayStream.addTrack(track);
     });
@@ -33,7 +31,6 @@ export async function startStreaming(roomId) {
 
     stream.getTracks().forEach((track) => {
       peerConnection.addTrack(track, stream);
-      console.log("Sendandi track:", track.kind, "enabled:", track.enabled);
     });
 
     const offer = await peerConnection.createOffer();
@@ -58,10 +55,6 @@ export async function startStreaming(roomId) {
         await addDoc(candidatesRef, event.candidate.toJSON());
       }
     };
-  } catch (err) {
-    console.error("Villa við að starta streymi:", err);
-  }
-}
   } catch (err) {
     console.error("Villa við að starta streymi:", err);
   }
@@ -94,7 +87,6 @@ export async function joinStreaming(roomId) {
       answer,
     });
 
-    // Send ICE candidates
     peerConnection.onicecandidate = async (event) => {
       if (event.candidate) {
         const candidatesRef = collection(db, "rooms", roomId, "calleeCandidates");
@@ -102,7 +94,6 @@ export async function joinStreaming(roomId) {
       }
     };
 
-    // Receive remote stream
     peerConnection.ontrack = (event) => {
       const remoteStream = event.streams[0];
       const audio = document.createElement("audio");
@@ -111,7 +102,6 @@ export async function joinStreaming(roomId) {
       document.body.appendChild(audio);
     };
 
-    // Listen for ICE candidates from caller
     const callerCandidatesRef = collection(db, "rooms", roomId, "callerCandidates");
     onSubcollectionSnapshot(callerCandidatesRef, (snapshot) => {
       snapshot.docChanges().forEach((change) => {
