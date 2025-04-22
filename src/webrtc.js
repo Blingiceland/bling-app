@@ -39,8 +39,6 @@ export async function startStreaming(roomId) {
       ...mixedAudioStream.getAudioTracks(),
     ]);
 
-    console.log("Dómari: Audio tracks:", mixedAudioStream.getAudioTracks());
-
     stream = combinedStream;
     peerConnection = new RTCPeerConnection();
 
@@ -115,20 +113,11 @@ export async function joinStreaming(roomId) {
 
     peerConnection.ontrack = (event) => {
       const remoteStream = event.streams[0];
-      console.log("Keppandi fékk remote stream:", remoteStream);
-      console.log("Audio tracks:", remoteStream.getAudioTracks());
-
+      console.log("Keppandi: Heyri remote track:", event.track.kind);
       const audio = document.createElement("audio");
       audio.srcObject = remoteStream;
       audio.autoplay = true;
-      audio.controls = true;
-
-      audio.onloadedmetadata = () => {
-        audio.play().catch((e) => console.error("Audio play error:", e));
-      };
-
       document.body.appendChild(audio);
-      console.log("Keppandi: bæti við audio player");
     };
 
     const callerCandidatesRef = collection(db, "rooms", roomId, "callerCandidates");
