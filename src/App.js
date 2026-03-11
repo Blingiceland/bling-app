@@ -10,6 +10,14 @@ import Footer from './components/Footer';
 import './index.css';
 import tabIcon from './assets/tab-icon.png';
 
+// Hidden redirect component for /stefna
+function StefnaRedirect() {
+    useEffect(() => {
+        window.location.href = 'https://dillonstefna.vercel.app/';
+    }, []);
+    return null;
+}
+
 function App() {
     useEffect(() => {
         // Dynamically set the favicon
@@ -30,6 +38,9 @@ function App() {
     return (
         <Router>
             <div className="App">
+                <Routes>
+                    <Route path="/stefna" element={<StefnaRedirect />} />
+                </Routes>
                 <Navbar />
                 <Routes>
                     <Route path="/" element={<Home />} />
@@ -46,3 +57,4 @@ function App() {
 }
 
 export default App;
+
