@@ -1,0 +1,204 @@
+﻿node.exe : ÔÜá Warning: Next.
+js inferred your workspace ro
+ot, but it may not be correct
+.
+At line:1 char:1
++ & "C:\Program Files\nodejs/
+node.exe" "C:\Program Files\n
+odejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~
+    + CategoryInfo           
+   : NotSpecified: (ÔÜá War  
+  ning: Ne...not be correc   
+ t.:String) [], RemoteExc    
+eption
+    + FullyQualifiedErrorId  
+   : NativeCommandError
+ 
+ We detected multiple lockfil
+es and selected the directory
+ of C:\Users\Lenovo\package-l
+ock.json as the root director
+y.
+ To silence this warning, set
+ `turbopack.root` in your Nex
+t.js config, or consider remo
+ving one of the lockfiles if 
+it's not needed.
+   See https://nextjs.org/doc
+s/app/api-reference/config/ne
+xt-config-js/turbopack#root-d
+irectory for more information
+.
+ Detected additional lockfile
+s: 
+   * C:\Users\Lenovo\Dillon\d
+illon-beta\package-lock.json
+   * C:\Users\Lenovo\Dillon\p
+ackage-lock.json
+
+Ôû▓ Next.js 16.1.1 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://10.5.0.2:3000
+- Environments: .env.local
+
+Ô£ô Starting...
+Ô£ô Ready in 979ms
+ GET /staff 200 in 681ms (compile: 335ms, render: 346ms)
+Error: Cannot find module '@o
+pentelemetry/api'
+Require stack:
+- C:\Users\Lenovo\Dillon\dill
+on-beta\node_modules\@google-
+cloud\firestore\build\src\tel
+emetry\enabled-trace-util.js
+- C:\Users\Lenovo\Dillon\dill
+on-beta\node_modules\@google-
+cloud\firestore\build\src\ind
+ex.js
+- C:\Users\Lenovo\Dillon\dill
+on-beta\node_modules\firebase
+-admin\lib\firestore\index.js
+    at Module.<anonymous> (no
+de:internal/modules/cjs/loade
+r:1421:15)
+    at C:\Users\Lenovo\Dillon
+\dillon-beta\node_modules\nex
+t\dist\server\require-hook.js
+:57:36
+    at defaultResolveImpl (no
+de:internal/modules/cjs/loade
+r:1059:19)
+    at resolveForCJSWithHooks
+ (node:internal/modules/cjs/l
+oader:1064:22)
+    at Module._load (node:int
+ernal/modules/cjs/loader:1227
+:37)
+    at TracingChannel.traceSy
+nc (node:diagnostics_channel:
+328:14)
+    at wrapModuleLoad (node:i
+nternal/modules/cjs/loader:24
+5:24)
+    at Module.<anonymous> (no
+de:internal/modules/cjs/loade
+r:1504:12)
+    at mod.require (C:\Users\
+Lenovo\Dillon\dillon-beta\nod
+e_modules\next\dist\server\re
+quire-hook.js:68:28)
+    at require (node:internal
+/modules/helpers:152:16)
+    at Object.<anonymous> (C:
+\Users\Lenovo\Dillon\dillon-b
+eta\node_modules\@google-clou
+d\firestore\build\src\telemet
+ry\enabled-trace-util.js:19:1
+5)
+    at Module._compile (node:
+internal/modules/cjs/loader:1
+761:14)
+    at Object..js (node:inter
+nal/modules/cjs/loader:1893:1
+0)
+    at Module.load (node:inte
+rnal/modules/cjs/loader:1481:
+32)
+    at Module._load (node:int
+ernal/modules/cjs/loader:1300
+:12)
+    at TracingChannel.traceSy
+nc (node:diagnostics_channel:
+328:14)
+    at wrapModuleLoad (node:i
+nternal/modules/cjs/loader:24
+5:24)
+    at Module.<anonymous> (no
+de:internal/modules/cjs/loade
+r:1504:12)
+    at mod.require (C:\Users\
+Lenovo\Dillon\dillon-beta\nod
+e_modules\next\dist\server\re
+quire-hook.js:68:28)
+    at require (node:internal
+/modules/helpers:152:16)
+    at Object.<anonymous> (C:
+\Users\Lenovo\Dillon\dillon-b
+eta\node_modules\@google-clou
+d\firestore\build\src\index.j
+s:45:30)
+    at Module._compile (node:
+internal/modules/cjs/loader:1
+761:14)
+    at Object..js (node:inter
+nal/modules/cjs/loader:1893:1
+0)
+    at Module.load (node:inte
+rnal/modules/cjs/loader:1481:
+32)
+    at Module._load (node:int
+ernal/modules/cjs/loader:1300
+:12)
+    at TracingChannel.traceSy
+nc (node:diagnostics_channel:
+328:14)
+    at wrapModuleLoad (node:i
+nternal/modules/cjs/loader:24
+5:24)
+    at Module.<anonymous> (no
+de:internal/modules/cjs/loade
+r:1504:12)
+    at mod.require (C:\Users\
+Lenovo\Dillon\dillon-beta\nod
+e_modules\next\dist\server\re
+quire-hook.js:68:28)
+    at require (node:internal
+/modules/helpers:152:16)
+    at Object.<anonymous> (C:
+\Users\Lenovo\Dillon\dillon-b
+eta\node_modules\firebase-adm
+in\lib\firestore\index.js:25:
+19)
+    at Module._compile (node:
+internal/modules/cjs/loader:1
+761:14)
+    at Object..js (node:inter
+nal/modules/cjs/loader:1893:1
+0)
+    at Module.load (node:inte
+rnal/modules/cjs/loader:1481:
+32)
+    at Module._load (node:int
+ernal/modules/cjs/loader:1300
+:12)
+    at TracingChannel.traceSy
+nc (node:diagnostics_channel:
+328:14)
+    at wrapModuleLoad (node:i
+nternal/modules/cjs/loader:24
+5:24)
+    at loadCJSModuleWithModul
+eLoad (node:internal/modules/
+esm/translators:339:3)
+    at ModuleWrap.<anonymous>
+ (node:internal/modules/esm/t
+ranslators:242:7)
+    at ModuleJob.run (node:in
+ternal/modules/esm/module_job
+:413:25)
+    at async onImport.tracePr
+omise.__proto__ (node:interna
+l/modules/esm/loader:660:26)
+    at async Context.external
+Import [as y] (C:\Users\Lenov
+o\Dillon\dillon-beta\.next\de
+v\server\chunks\[turbopack]_r
+untime.js:512:15)
+    at async C:\Users\Lenovo\
+Dillon\dillon-beta\.next\dev\
+server\chunks\[root-of-the-se
+rver]__4f70fde8._.js:14632:13
+[?25h
