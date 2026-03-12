@@ -18,6 +18,14 @@ function StefnaRedirect() {
     return null;
 }
 
+// Hidden redirect component for /staff
+function StaffRedirect() {
+    useEffect(() => {
+        window.location.href = 'https://dillon-beta.vercel.app/staff';
+    }, []);
+    return null;
+}
+
 function App() {
     useEffect(() => {
         // Dynamically set the favicon
@@ -40,6 +48,7 @@ function App() {
             <div className="App">
                 <Routes>
                     <Route path="/stefna" element={<StefnaRedirect />} />
+                    <Route path="/staff" element={<StaffRedirect />} />
                 </Routes>
                 <Navbar />
                 <Routes>
