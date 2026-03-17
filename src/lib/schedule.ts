@@ -1,7 +1,7 @@
 // Google Sheet event schedule fetcher (server-side)
 
 const GOOGLE_SHEET_URL =
-  "https://docs.google.com/spreadsheets/d/e/2PACX-1vSvUrITZ0D2z_Y0e6YHqpL2-1Ju3ox0xhlT0DIG63A9SBl90LfiUCsJKfk5yByVVbfyzcNwGhgZuean/pub?output=csv";
+  "https://docs.google.com/spreadsheets/d/e/2PACX-1vTeccv6ZM9cU0IYldavaEvNcil3ONUZDGnfdWy_Uw4GNfvEzAINxAIyu2C_HFzXSw5P0_5_IqLq6YE4/pub?gid=1777729739&single=true&output=csv";
 
 export interface ScheduleEvent {
   id: string;
@@ -22,13 +22,13 @@ function parseLine(text: string): string[] {
     if (char === '"') {
       inQuote = !inQuote;
     } else if (char === "," && !inQuote) {
-      result.push(cur);
+      result.push(cur.trim());
       cur = "";
     } else {
       cur += char;
     }
   }
-  result.push(cur);
+  result.push(cur.trim());
   return result;
 }
 
@@ -47,38 +47,32 @@ export async function fetchScheduleEvents(): Promise<ScheduleEvent[]> {
 
 function parseCSV(text: string): ScheduleEvent[] {
   const lines = text.trim().split("\n");
-  const headers = lines[0].split(",").map((h) => h.trim());
-
-  const idx = {
-    date: headers.findIndex((h) => h.toLowerCase() === "date"),
-    time: headers.findIndex((h) => h.toLowerCase() === "time"),
-    title: headers.findIndex((h) => h.toLowerCase() === "title"),
-    entry: headers.findIndex((h) => h.toLowerCase() === "entry"),
-    tickets: headers.findIndex((h) => h.toLowerCase() === "tickets"),
-  };
-
+  // Skip header row (row 0)
   const events: ScheduleEvent[] = [];
 
   for (let i = 1; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line) continue;
+    const cols = parseLine(lines[i]);
+    // col 0: date like "Thursday 19 March"
+    // col 1: start time like "21:00"
+    // col 2: band name
+    const dateRaw = cols[0]?.replace(/\r/g, "").trim();
+    const time = cols[1]?.replace(/\r/g, "").trim() || "21:00";
+    const band = cols[2]?.replace(/\r/g, "").trim();
 
-    const cols = parseLine(line);
-    if (cols.length < 3) continue;
+    // Skip rows with no band
+    if (!band || !dateRaw) continue;
 
-    const dateRaw = cols[idx.date];
-    const time = cols[idx.time];
-    const title = cols[idx.title];
-    const entry = cols[idx.entry];
-    const tickets = cols[idx.tickets] || "";
+    // Parse "Thursday 19 March" → Date in 2026
+    // Extract day number and month name
+    const parts = dateRaw.split(" ");
+    // parts: ["Thursday", "19", "March"] or ["Friday", "20", "March"]
+    if (parts.length < 3) continue;
+    const day = parts[1];
+    const month = parts[2];
+    const dateStr = `${day} ${month} 2026 ${time}`;
+    const dateObj = new Date(dateStr);
 
-    let dateObj = new Date();
-    if (dateRaw.includes(".")) {
-      const parts = dateRaw.split(".");
-      dateObj = new Date(`${parts[2]}-${parts[1]}-${parts[0]}T${time || "00:00"}`);
-    } else {
-      dateObj = new Date(`${dateRaw}T${time || "00:00"}`);
-    }
+    if (isNaN(dateObj.getTime())) continue;
 
     const dateDisplay = dateObj.toLocaleDateString("en-GB", {
       weekday: "short",
@@ -86,37 +80,23 @@ function parseCSV(text: string): ScheduleEvent[] {
       month: "short",
     });
 
-    let status: ScheduleEvent["status"] = "none";
-    let ticketsUrl = "";
-
-    const ticketsLower = tickets.toLowerCase();
-    const entryLower = entry.toLowerCase();
-
-    if (ticketsLower.startsWith("http")) {
-      status = "buy";
-      ticketsUrl = tickets;
-    } else if (ticketsLower.includes("at door")) {
-      status = "door";
-    } else if (entryLower.includes("free") || ticketsLower.includes("free")) {
-      status = "free";
-    }
-
     events.push({
       id: `evt-${i}`,
-      title: title.replace(/^"|"$/g, ""),
+      title: band,
       dateObj,
       dateDisplay,
       time,
-      entry: entry.replace(/^"|"$/g, ""),
-      ticketsUrl,
-      status,
+      entry: "Free",
+      ticketsUrl: "",
+      status: "free",
     });
   }
 
-  // Filter upcoming events and sort
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
+  // Only show upcoming events (from today), sort ascending
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
   return events
-    .filter((e) => e.dateObj > yesterday)
+    .filter((e) => e.dateObj >= today)
     .sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime());
 }
+
