@@ -20,6 +20,8 @@ export default function Navbar() {
         <a href="https://bce3rd-eu.myshopify.com/" target="_blank" rel="noopener noreferrer" className="site-nav-link">Merchandise</a>
         <span className="text-gold">•</span>
         <Link href="/bookdillon" className="site-nav-link">Book Dillon</Link>
+        <span className="text-gold">•</span>
+        <Link href="/whisky-list" className="site-nav-link">Whisky List</Link>
       </div>
 
       {/* Logo Container - HIDDEN ON EVENTS/WHATSON PAGES */}
