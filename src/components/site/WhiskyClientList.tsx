@@ -217,7 +217,7 @@ export default function WhiskyClientList({ whiskies }: Props) {
           fontSize: "0.85rem",
         }}
       >
-        <p>Prices are in ISK per glass. Selection may vary.</p>
+        <p>Prices are in ISK per 3 cl. Selection may vary.</p>
       </div>
       
       {/* Add mobile CSS via inline style to hide category column on very small screens to make space for the name and price */}
