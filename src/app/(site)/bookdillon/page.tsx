@@ -43,19 +43,6 @@ export default async function BookDillonPage() {
           fontFamily: "var(--font-heading)",
           textTransform: "uppercase",
         }}>Book Dillon</h1>
-
-        <p style={{
-          fontSize: "1.2rem",
-          lineHeight: "1.6",
-          fontFamily: "var(--font-body)",
-          color: "#ccc",
-          maxWidth: "700px",
-          margin: "0 auto"
-        }}>
-          If you want to book Dillon for a private event or for a live music event, 
-          please check the calendar for available dates and submit an inquiry below, 
-          or email us directly at <a href="mailto:dillon@dillon.is" className="text-gold" style={{ textDecoration: "underline" }}>dillon@dillon.is</a>.
-        </p>
       </div>
 
       <div style={{ width: "90%", maxWidth: "800px" }}>
