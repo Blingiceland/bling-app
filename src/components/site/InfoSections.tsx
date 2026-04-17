@@ -1,3 +1,5 @@
+import FadeIn from "@/components/ui/FadeIn";
+
 interface SectionProps {
   title: string;
   text: string[];
@@ -7,11 +9,12 @@ interface SectionProps {
 
 function Section({ title, text, image, imageLeft }: SectionProps) {
   return (
-    <div
-      id={title === "Whisky" ? "whiskey" : undefined}
-      className={`info-section ${imageLeft ? "reverse" : ""}`}
-    >
-      <div className="info-text">
+    <FadeIn delay={100}>
+      <div
+        id={title === "Whisky" ? "whiskey" : undefined}
+        className={`info-section ${imageLeft ? "reverse" : ""}`}
+      >
+        <div className="info-text">
         <h2 style={{
           fontSize: "48px",
           color: "var(--color-gold)",
@@ -40,7 +43,8 @@ function Section({ title, text, image, imageLeft }: SectionProps) {
         className="info-image"
         style={{ backgroundImage: `url(${image})` }}
       />
-    </div>
+      </div>
+    </FadeIn>
   );
 }
 
