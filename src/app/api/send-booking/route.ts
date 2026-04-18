@@ -15,6 +15,7 @@ export async function POST(req: Request) {
     const mailOptions = {
       from: FROM_EMAIL,
       to: BCC_EMAIL,
+      cc: "oliver@dillon.is",
       replyTo: email,
       subject: `Booking Request: ${bandName || name} on ${date}`,
       html: `
