@@ -41,7 +41,7 @@ function parseWhiskyCSV(text: string): WhiskyItem[] {
     if (name === "Non Whisky Products") break;
 
     // Skip empty rows
-    if (!name || !category) continue;
+    if (!name || !category || name === "") continue;
 
     whiskies.push({ name, category, price: price || "" });
   }
@@ -50,4 +50,47 @@ function parseWhiskyCSV(text: string): WhiskyItem[] {
   whiskies.sort((a, b) => a.name.localeCompare(b.name));
 
   return whiskies;
+}
+
+export async function fetchDrinksList(): Promise<WhiskyItem[]> {
+  try {
+    const response = await fetch(WHISKY_CSV_URL, {
+      next: { revalidate: 3600 },
+    });
+    const text = await response.text();
+    return parseDrinksCSV(text);
+  } catch (error) {
+    console.error("Failed to fetch drinks list:", error);
+    return [];
+  }
+}
+
+function parseDrinksCSV(text: string): WhiskyItem[] {
+  const lines = text.trim().split("\n");
+  const drinks: WhiskyItem[] = [];
+  let foundDrinksSection = false;
+
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i].replace(/\r/g, "").trim();
+    if (!line) continue;
+
+    const parts = line.split(",");
+    const name = parts[0]?.trim();
+    const category = parts[1]?.trim();
+    const price = parts[2]?.trim();
+
+    if (name === "Non Whisky Products") {
+      foundDrinksSection = true;
+      continue;
+    }
+
+    if (!foundDrinksSection) continue;
+    
+    // Once in the drinks section, push every valid line (don't alphabetize it as requested)
+    if (!name || !category || name === "") continue;
+
+    drinks.push({ name, category, price: price || "" });
+  }
+
+  return drinks;
 }

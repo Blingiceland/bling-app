@@ -22,6 +22,8 @@ export default function Navbar() {
         <Link href="/bookdillon" className="site-nav-link">Book Dillon</Link>
         <span className="text-gold">•</span>
         <Link href="/whisky-list" className="site-nav-link">Whisky List</Link>
+        <span className="text-gold">•</span>
+        <Link href="/drinks" className="site-nav-link">Drinks Menu</Link>
       </div>
 
       {/* Logo Container - HIDDEN ON EVENTS/WHATSON PAGES */}
