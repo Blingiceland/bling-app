@@ -12,7 +12,7 @@ export interface WhiskyItem {
 export async function fetchWhiskyList(): Promise<WhiskyItem[]> {
   try {
     const response = await fetch(WHISKY_CSV_URL, {
-      next: { revalidate: 3600 },
+      next: { revalidate: 300 }, // 5 minutes cache
     });
     const text = await response.text();
     return parseWhiskyCSV(text);
@@ -55,7 +55,7 @@ function parseWhiskyCSV(text: string): WhiskyItem[] {
 export async function fetchDrinksList(): Promise<WhiskyItem[]> {
   try {
     const response = await fetch(WHISKY_CSV_URL, {
-      next: { revalidate: 3600 },
+      next: { revalidate: 300 }, // 5 minutes cache
     });
     const text = await response.text();
     return parseDrinksCSV(text);
